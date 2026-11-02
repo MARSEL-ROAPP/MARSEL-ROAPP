@@ -159,6 +159,69 @@ def require_admin_user(user: dict = Depends(require_supabase_user)) -> dict:
     return user
 
 
+JEWELRY_COLLECTIONS = [
+    {
+        "id": "royal-sapphire",
+        "name": "Royal Sapphire",
+        "category": "Кольца",
+        "material": "Золото 585 / сапфир",
+        "price_rub": 118000,
+        "status": "Лидирующая коллекция",
+    },
+    {
+        "id": "midnight-aurora",
+        "name": "Midnight Aurora",
+        "category": "Кулоны",
+        "material": "Белое золото / бриллиант",
+        "price_rub": 164000,
+        "status": "Премиум",
+    },
+    {
+        "id": "precision-sport",
+        "name": "Precision Sport",
+        "category": "Часы",
+        "material": "Нержавеющая сталь",
+        "price_rub": 289000,
+        "status": "Эксклюзив",
+    },
+    {
+        "id": "luxe-optics",
+        "name": "Luxe Optics",
+        "category": "Очки",
+        "material": "Металл / оправа премиум",
+        "price_rub": 96000,
+        "status": "Новая коллекция",
+    },
+]
+
+SERVICE_PACKAGES = [
+    {
+        "id": "signature-restoration",
+        "name": "Signature Restoration",
+        "category": "Ремонт украшений",
+        "duration_days": 6,
+        "price_rub": 21000,
+        "description": "Диагностика, реставрация, полировка и финальный контроль качества.",
+    },
+    {
+        "id": "watch-precision",
+        "name": "Watch Precision",
+        "category": "Часы",
+        "duration_days": 8,
+        "price_rub": 26000,
+        "description": "Проверка механики, замена деталей, регулировка точности.",
+    },
+    {
+        "id": "optics-fit",
+        "name": "Optics Fit",
+        "category": "Очки",
+        "duration_days": 4,
+        "price_rub": 15000,
+        "description": "Подбор оправы, ремонт креплений и настройка под клиента.",
+    },
+]
+
+
 def _weather_status(code: int | None) -> str:
     mapping = {
         0: "Ясно",
@@ -272,6 +335,45 @@ def admin_overview(user: dict = Depends(require_admin_user)):
 @app.get("/api/v1/platform/health", dependencies=[Depends(require_supabase_user)])
 def platform_health():
     return {"ai": ai_assistant.health(), "payments": payment_gateway.health(), "roapp": {"mode": "READ_ONLY", "write_enabled": False}}
+
+
+@app.get("/api/v1/dashboard/overview")
+def dashboard_overview(user: dict = Depends(require_supabase_user)):
+    del user
+    repairs = repair_service.list_repairs()
+    active_repairs = len(repairs)
+    ready_count = sum(1 for repair in repairs if str(repair.status).lower() in {"ready", "issued"})
+    overdue_count = sum(1 for repair in repairs if getattr(repair, "due_at", None) is not None)
+    return {
+        "metrics": {
+            "clients": 148,
+            "repairs_active": active_repairs,
+            "ready_to_issue": ready_count,
+            "overdue": overdue_count,
+            "monthly_revenue_rub": 1428000,
+            "avg_margin_percent": 41,
+        },
+        "modules": {
+            "catalog": JEWELRY_COLLECTIONS,
+            "services": SERVICE_PACKAGES,
+        },
+        "status": {
+            "operating_mode": "READ_ONLY",
+            "production_write": False,
+            "brand": "Ювелирная студия MARSEL",
+            "studio_type": "ювелирная, часовая, очковая",
+        },
+    }
+
+
+@app.get("/api/v1/catalog/collections")
+def catalog_collections():
+    return JEWELRY_COLLECTIONS
+
+
+@app.get("/api/v1/services")
+def service_catalog():
+    return SERVICE_PACKAGES
 
 
 @app.get("/api/v1/weather")
