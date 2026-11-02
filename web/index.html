@@ -483,6 +483,13 @@
       n.className = "notice " + k;
     };
 
+    async function getAuthHeaders() {
+      if (!sb) return {};
+      const session = await sb.auth.getSession();
+      const token = session.data.session?.access_token;
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    }
+
     async function init() {
       const c = await fetch("/app/config").then(r => r.json());
       if (!c.supabase_url || !c.supabase_publishable_key) {
@@ -537,6 +544,8 @@
       $("auth").style.display = "none";
       $("shell").style.display = "grid";
       await loadAll();
+      await loadDashboardData();
+      await loadWeather();
     }
 
     function go(view) {
@@ -599,12 +608,25 @@
     }
 
     async function loadDashboardData() {
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) {
+        renderBusinessCards({
+          catalog: [
+            { id: "royal-sapphire", name: "Royal Sapphire", category: "Кольца", material: "Золото 585 / сапфир", price_rub: 118000 },
+            { id: "midnight-aurora", name: "Midnight Aurora", category: "Кулоны", material: "Белое золото / бриллиант", price_rub: 164000 },
+          ],
+          services: [
+            { id: "signature-restoration", name: "Signature Restoration", category: "Ремонт украшений", price_rub: 21000 },
+          ],
+        });
+        return;
+      }
+
       try {
-        const response = await fetch("/api/v1/dashboard/overview", { headers: { Authorization: "Bearer demo" } });
-        if (response.ok) {
-          const data = await response.json();
-          renderBusinessCards(data.modules || {});
-        }
+        const response = await fetch("/api/v1/dashboard/overview", { headers });
+        if (!response.ok) throw new Error("Dashboard unavailable");
+        const data = await response.json();
+        renderBusinessCards(data.modules || {});
       } catch (e) {
         renderBusinessCards({
           catalog: [
@@ -654,8 +676,16 @@
     }
 
     async function loadWeather() {
+      const headers = await getAuthHeaders();
+      if (!headers.Authorization) {
+        $("weatherTemp").textContent = "18°C";
+        $("weatherCity").textContent = "Москва";
+        $("weatherStatus").textContent = "Лёгкая облачность";
+        return;
+      }
+
       try {
-        const response = await fetch("/api/v1/weather?city=Москва", { headers: { Authorization: "Bearer demo" } });
+        const response = await fetch("/api/v1/weather?city=Москва", { headers });
         if (!response.ok) throw new Error("Weather unavailable");
         const data = await response.json();
         $("weatherTemp").textContent = `${Number(data.temperature_c ?? 0).toFixed(0)}°C`;
