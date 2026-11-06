@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import json
 from types import SimpleNamespace
 
@@ -240,9 +242,6 @@ def test_tool_loop_rejects_executor_without_policy_confirmation():
         service.run_task("Run a bounded local task.")
 
     assert len(openai.responses.calls) == 1
-
-
-from contextlib import contextmanager
 
 
 class FakeSandboxRuntime:
