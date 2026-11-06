@@ -240,3 +240,52 @@ def test_tool_loop_rejects_executor_without_policy_confirmation():
         service.run_task("Run a bounded local task.")
 
     assert len(openai.responses.calls) == 1
+
+
+from contextlib import contextmanager
+
+
+class FakeSandboxRuntime:
+    def __init__(self):
+        self.closed = False
+        self.origins = None
+
+    @contextmanager
+    def open(self, allowed_origins):
+        self.origins = list(allowed_origins)
+        try:
+            yield SimpleNamespace(
+                url="https://sandbox.example.test/execute",
+                token="ephemeral-runtime-token",
+            )
+        finally:
+            self.closed = True
+
+
+def test_computer_use_uses_one_disposable_sandbox_for_the_full_task():
+    openai = FakeOpenAI([
+        response("resp_1", [function_call()]),
+        response("resp_2", [], "Task completed."),
+    ])
+    runtime = FakeSandboxRuntime()
+    service = ComputerUseService(
+        settings_obj=configured_settings(),
+        openai_client=openai,
+        sandbox_runtime=runtime,
+    )
+    executions = []
+
+    def execute(**kwargs):
+        executions.append(kwargs)
+        return [{"type": "input_text", "text": "page title: MARSEL"}]
+
+    service._execute_in_sandbox = execute
+    result = service.run_task("Read the page title.")
+
+    assert result["final_text"] == "Task completed."
+    assert runtime.origins == ["http://127.0.0.1:8000"]
+    assert runtime.closed is True
+    assert len(executions) == 1
+    assert executions[0]["runtime_url"] == "https://sandbox.example.test/execute"
+    assert executions[0]["runtime_token"] == "ephemeral-runtime-token"
+    assert executions[0]["policy"]["filesystem_access"] == "sandbox_only"
