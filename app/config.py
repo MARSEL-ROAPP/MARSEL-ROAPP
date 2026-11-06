@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     computer_use_runtime_token: str = ""
     computer_use_allowed_origins: list[str] = Field(default_factory=list)
     computer_use_runtime_timeout_seconds: int = 45
+    computer_use_sandbox_region: str = "fra1"
+    computer_use_sandbox_timeout_seconds: int = 600
     computer_use_max_turns: int = 8
     computer_use_max_tool_calls: int = 12
     computer_use_max_code_chars: int = 20000
