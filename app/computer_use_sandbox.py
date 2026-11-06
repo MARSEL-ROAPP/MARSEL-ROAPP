@@ -183,6 +183,13 @@ class VercelSandboxRuntime:
                 requirements_path,
             ],
         )
+        # Install Chromium and its OS libraries while setup egress is still open.
+        self._run_checked(
+            box,
+            "python",
+            ["-m", "playwright", "install", "--with-deps", "chromium"],
+            sudo=True,
+        )
 
     def _apply_network_policy(self, box: Any, policy: Any, expected_mode: str) -> None:
         # Current SDK update() persists the policy and applies it to the active
