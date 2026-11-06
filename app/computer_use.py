@@ -211,7 +211,6 @@ class ComputerUseService:
         timeout = float(getattr(self.settings, "computer_use_runtime_timeout_seconds", 45))
         payload = {
             "session_id": session_id,
-            "language": "python",
             "code": code,
             "policy": policy,
         }
