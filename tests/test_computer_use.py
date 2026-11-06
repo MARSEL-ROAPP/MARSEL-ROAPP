@@ -288,3 +288,66 @@ def test_computer_use_uses_one_disposable_sandbox_for_the_full_task():
     assert executions[0]["runtime_url"] == "https://sandbox.example.test/execute"
     assert executions[0]["runtime_token"] == "ephemeral-runtime-token"
     assert executions[0]["policy"]["filesystem_access"] == "sandbox_only"
+
+
+class FakeStreamResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def raise_for_status(self):
+        return None
+
+    def iter_bytes(self):
+        yield json.dumps({
+            "policy_enforced": True,
+            "output": [{"type": "input_text", "text": "ok"}],
+        }).encode()
+
+
+class FakeStreamingHTTPClient:
+    def __init__(self):
+        self.request = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def stream(self, method, url, *, headers, json):
+        self.request = {
+            "method": method,
+            "url": url,
+            "headers": headers,
+            "json": json,
+        }
+        return FakeStreamResponse()
+
+
+def test_runtime_http_request_matches_strict_execute_schema(monkeypatch):
+    from app import computer_use
+
+    http_client = FakeStreamingHTTPClient()
+    monkeypatch.setattr(computer_use.httpx, "Client", lambda **kwargs: http_client)
+    service = ComputerUseService(settings_obj=configured_settings())
+
+    output = service._execute_in_sandbox(
+        session_id="00000000-0000-4000-8000-000000000001",
+        code="log('ok')",
+        runtime_url="https://sandbox.example.test/execute",
+        runtime_token="runtime-token",
+        policy={"allowed_origins": ["https://example.com"]},
+    )
+
+    assert output == [{"type": "input_text", "text": "ok"}]
+    assert http_client.request["method"] == "POST"
+    assert http_client.request["url"] == "https://sandbox.example.test/execute"
+    assert http_client.request["headers"]["Authorization"] == "Bearer runtime-token"
+    assert http_client.request["json"] == {
+        "session_id": "00000000-0000-4000-8000-000000000001",
+        "code": "log('ok')",
+        "policy": {"allowed_origins": ["https://example.com"]},
+    }
